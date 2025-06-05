@@ -12,9 +12,8 @@ import {
 } from "react-native";
 import { SafeAreaView, useSafeAreaInsets } from "react-native-safe-area-context";
 import AsyncStorage from "@react-native-async-storage/async-storage";
-
-// Lista de DNIs de administradores
-const ADMIN_DNIS = ["75785723X", "31310901N"];
+import { getFirestore, doc, getDoc } from "firebase/firestore";
+import appFirebase from "./credenciales";
 
 // Paleta de colores usada en la pantalla
 const COLORS = {
@@ -40,10 +39,14 @@ function normalize(size) {
   return Math.round(PixelRatio.roundToNearestPixel(size * scale));
 }
 
+// Inicializa Firestore
+const db = getFirestore(appFirebase);
+
 // Pantalla principal tras el login
 const HomeScreen = ({ navigation, route }) => {
   // Estado para el usuario actual
   const [user, setUser] = React.useState({ nombre: "", dni: "" });
+  const [adminDNIs, setAdminDNIs] = React.useState([]);
   const insets = useSafeAreaInsets();
 
   // Carga el usuario desde los parámetros de navegación o desde almacenamiento local
@@ -62,8 +65,20 @@ const HomeScreen = ({ navigation, route }) => {
     loadUser();
   }, [route.params]);
 
+  // Carga la lista de administradores desde Firestore
+  React.useEffect(() => {
+    async function loadAdmins() {
+      const configRef = doc(db, "app", "config");
+      const configSnap = await getDoc(configRef);
+      if (configSnap.exists()) {
+        setAdminDNIs(configSnap.data().adminDNIs || []);
+      }
+    }
+    loadAdmins();
+  }, []);
+
   // Determina si el usuario es administrador
-  const isAdmin = ADMIN_DNIS.includes(user.dni);
+  const isAdmin = adminDNIs.includes(user.dni);
 
   // Botón superior: lleva siempre a la pantalla de cambio de contraseña
   const handleUserButton = () => {

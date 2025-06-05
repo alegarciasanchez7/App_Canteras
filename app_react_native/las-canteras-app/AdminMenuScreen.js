@@ -17,7 +17,7 @@ import {
   TouchableOpacity,
 } from "react-native";
 import { SafeAreaView, useSafeAreaInsets } from "react-native-safe-area-context";
-import { getFirestore, collection, getDocs, doc, setDoc, updateDoc, deleteDoc } from "firebase/firestore";
+import { getFirestore, collection, getDocs, doc, setDoc, updateDoc, deleteDoc, getDoc } from "firebase/firestore";
 import appFirebase from "./credenciales";
 import CryptoJS from "crypto-js";
 import * as Print from "expo-print";
@@ -97,12 +97,15 @@ const AdminMenuScreen = ({ navigation, route }) => {
   const [filterModalVisible, setFilterModalVisible] = useState(false);
   const [espacioUsado, setEspacioUsado] = useState(0);
   const [porcentajeEspacio, setPorcentajeEspacio] = useState(0);
+  const [nuevoAdminDNI, setNuevoAdminDNI] = useState("");
+  const [adminDNIs, setAdminDNIs] = useState([]); // Añade este estado para almacenar la lista de DNIs administradores
   const insets = useSafeAreaInsets();
 
   // Carga los socios y calcula el espacio usado al montar el componente
   useEffect(() => {
     cargarSocios();
     calcularEspacio();
+    cargarAdmins();
   }, []);
 
   // Función para cargar todos los socios desde Firestore
@@ -210,6 +213,82 @@ const AdminMenuScreen = ({ navigation, route }) => {
     );
   };
 
+  // Carga la lista de administradores desde Firestore
+  const cargarAdmins = async () => {
+    try {
+      const configRef = doc(db, "app", "config");
+      const configSnap = await getDoc(configRef);
+      if (configSnap.exists()) {
+        setAdminDNIs(configSnap.data().adminDNIs || []);
+      }
+    } catch (e) {
+      setAdminDNIs([]);
+    }
+  };
+
+  // Función para convertir un socio en administrador (con confirmación)
+  const handleConvertirAdmin = (dniSocio) => {
+    const socio = socios.find((s) => s.DNI === dniSocio);
+    const nombreSocio = socio ? socio.Nombre : dniSocio;
+    if (adminDNIs.includes(dniSocio)) {
+      Alert.alert("Info", "Este usuario ya es administrador.");
+      return;
+    }
+    Alert.alert(
+      "Confirmar",
+      `¿Seguro que quieres convertir a "${nombreSocio}" en administrador/a?`,
+      [
+        { text: "Cancelar", style: "cancel" },
+        {
+          text: "Sí, convertir",
+          style: "default",
+          onPress: async () => {
+            try {
+              const configRef = doc(db, "app", "config");
+              await updateDoc(configRef, {
+                adminDNIs: [...adminDNIs, dniSocio],
+              });
+              setAdminDNIs((prev) => [...prev, dniSocio]);
+              Alert.alert("Éxito", `El socio "${nombreSocio}" ahora es administrador/a.`);
+            } catch (e) {
+              Alert.alert("Error", "No se pudo convertir en administrador/a.");
+            }
+          },
+        },
+      ]
+    );
+  };
+
+  // Añade la función para eliminar privilegios de administrador (con confirmación)
+  const handleEliminarAdmin = (dniSocio) => {
+    const socio = socios.find((s) => s.DNI === dniSocio);
+    const nombreSocio = socio ? socio.Nombre : dniSocio;
+    Alert.alert(
+      "Confirmar",
+      `¿Seguro que quieres quitar los privilegios de administrador/a a "${nombreSocio}"?`,
+      [
+        { text: "Cancelar", style: "cancel" },
+        {
+          text: "Sí, eliminar",
+          style: "destructive",
+          onPress: async () => {
+            try {
+              const configRef = doc(db, "app", "config");
+              const nuevosAdmins = adminDNIs.filter((dni) => dni !== dniSocio);
+              await updateDoc(configRef, {
+                adminDNIs: nuevosAdmins,
+              });
+              setAdminDNIs(nuevosAdmins);
+              Alert.alert("Éxito", `El socio "${nombreSocio}" ya no es administrador/a.`);
+            } catch (e) {
+              Alert.alert("Error", "No se pudo eliminar el administrador/a.");
+            }
+          },
+        },
+      ]
+    );
+  };
+
   // Filtra los socios según el texto de búsqueda y el campo seleccionado
   const sociosFiltrados = socios.filter((socio) => {
     const search = searchText.toLowerCase();
@@ -286,6 +365,33 @@ const AdminMenuScreen = ({ navigation, route }) => {
       }
     } catch (e) {
       Alert.alert("Error", "No se pudo generar ni compartir el PDF.");
+    }
+  };
+
+  // Función para añadir un nuevo admin
+  const handleAddAdmin = async () => {
+    if (!nuevoAdminDNI) {
+      Alert.alert("Error", "Introduce un DNI válido.");
+      return;
+    }
+    try {
+      const configRef = doc(db, "app", "config");
+      const configSnap = await getDoc(configRef);
+      let currentAdmins = [];
+      if (configSnap.exists()) {
+        currentAdmins = configSnap.data().adminDNIs || [];
+      }
+      if (!currentAdmins.includes(nuevoAdminDNI)) {
+        await updateDoc(configRef, {
+          adminDNIs: [...currentAdmins, nuevoAdminDNI],
+        });
+        Alert.alert("Éxito", "Nuevo administrador añadido.");
+        setNuevoAdminDNI("");
+      } else {
+        Alert.alert("Info", "Ese DNI ya es administrador.");
+      }
+    } catch (e) {
+      Alert.alert("Error", "No se pudo añadir el administrador.");
     }
   };
 
@@ -526,22 +632,44 @@ const AdminMenuScreen = ({ navigation, route }) => {
               <View style={styles.socioItem}>
                 <View style={{ flex: 1 }}>
                   <Text style={styles.socioText}>
-                    <Text style={{ fontWeight: "bold" }}>Nº Socio:</Text> {item.NumeroSocio}
+                    <Text style={styles.socioLabel}>Nº Socio:</Text> {item.NumeroSocio}
                   </Text>
                   <Text style={styles.socioText}>
-                    <Text style={{ fontWeight: "bold" }}>NIF:</Text> {item.DNI}
+                    <Text style={styles.socioLabel}>NIF:</Text> {item.DNI}
                   </Text>
                   <Text style={styles.socioText}>
-                    <Text style={{ fontWeight: "bold" }}>Nombre:</Text> {item.Nombre}
+                    <Text style={styles.socioLabel}>Nombre:</Text> {item.Nombre}
                   </Text>
                 </View>
-                <View style={styles.socioButtons}>
-                  <Pressable style={styles.editButton} onPress={() => handleEditar(item)}>
-                    <Text style={styles.buttonText}>Editar</Text>
-                  </Pressable>
-                  <Pressable style={styles.deleteButton} onPress={() => handleEliminar(item)}>
-                    <Text style={styles.buttonText}>Borrar</Text>
-                  </Pressable>
+                <View style={styles.socioButtonsContainer}>
+                  <View style={styles.socioButtonsRow}>
+                    <Pressable style={styles.editButton} onPress={() => handleEditar(item)}>
+                      <Text style={styles.buttonText}>Editar</Text>
+                    </Pressable>
+                    <Pressable style={styles.deleteButton} onPress={() => handleEliminar(item)}>
+                      <Text style={styles.buttonText}>Borrar</Text>
+                    </Pressable>
+                  </View>
+                  {/* Botón para convertir en administrador */}
+                  {!adminDNIs.includes(item.DNI) && (
+                    <Pressable
+                      style={styles.adminButton}
+                      onPress={() => handleConvertirAdmin(item.DNI)}
+                    >
+                      <Text style={styles.adminButtonText}>Convertir</Text>
+                      <Text style={styles.adminButtonText}>administrador</Text>
+                    </Pressable>
+                  )}
+                  {/* Botón para eliminar privilegios de administrador */}
+                  {adminDNIs.includes(item.DNI) && (
+                    <Pressable
+                      style={styles.removeAdminButton}
+                      onPress={() => handleEliminarAdmin(item.DNI)}
+                    >
+                      <Text style={styles.removeAdminButtonText}>Eliminar</Text>
+                      <Text style={styles.removeAdminButtonText}>administrador</Text>
+                    </Pressable>
+                  )}
                 </View>
               </View>
             )}
@@ -704,9 +832,19 @@ const styles = StyleSheet.create({
     fontSize: normalize(15),
     color: "#222",
   },
-  socioButtons: {
-    flexDirection: "row",
+  socioLabel: {
+    fontWeight: "bold",
+    color: "#222",
+  },
+  socioButtonsContainer: {
+    flexDirection: "column",
+    alignItems: "flex-end",
+    justifyContent: "center",
     marginLeft: normalize(10),
+  },
+  socioButtonsRow: {
+    flexDirection: "row",
+    marginBottom: normalize(6),
   },
   editButton: {
     backgroundColor: "#1976D2",
@@ -722,6 +860,43 @@ const styles = StyleSheet.create({
     paddingHorizontal: normalize(10),
     borderRadius: normalize(6),
     alignItems: "center",
+  },
+  adminButton: {
+    backgroundColor: "#4CAF50",
+    paddingVertical: normalize(6),
+    paddingHorizontal: normalize(10),
+    borderRadius: normalize(6),
+    alignItems: "center",
+    marginLeft: normalize(5),
+    width: normalize(110),
+    alignSelf: "flex-end",
+    justifyContent: "center",
+  },
+  adminButtonText: {
+    color: COLORS.white,
+    fontSize: normalize(12),
+    fontWeight: "bold",
+    textAlign: "center",
+    lineHeight: normalize(16),
+  },
+  removeAdminButton: {
+    backgroundColor: "#D32F2F",
+    paddingVertical: normalize(6),
+    paddingHorizontal: normalize(10),
+    borderRadius: normalize(6),
+    alignItems: "center",
+    marginLeft: normalize(5),
+    width: normalize(110),
+    alignSelf: "flex-end",
+    marginTop: normalize(4),
+    justifyContent: "center",
+  },
+  removeAdminButtonText: {
+    color: COLORS.white,
+    fontSize: normalize(12),
+    fontWeight: "bold",
+    textAlign: "center",
+    lineHeight: normalize(16),
   },
   backButton: {
     backgroundColor: "#888",

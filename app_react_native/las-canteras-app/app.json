@@ -1,0 +1,43 @@
+{
+  "expo": {
+    "name": "Asociación Las Canteras",
+    "slug": "las-canteras-app",
+    "version": "1.0.0",
+    "orientation": "portrait",
+    "icon": "./assets/logo.jpeg",
+    "userInterfaceStyle": "light",
+    "newArchEnabled": true,
+    "splash": {
+      "image": "./assets/logo.jpeg",
+      "resizeMode": "contain",
+      "backgroundColor": "#ffffff"
+    },
+    "ios": {
+      "supportsTablet": true
+    },
+    "android": {
+      "adaptiveIcon": {
+        "foregroundImage": "./assets/logo.jpeg",
+        "backgroundColor": "#ffffff"
+      },
+      "package": "com.skylers7.lascanterasapp"
+    },
+    "web": {
+      "favicon": "./assets/logo.jpeg"
+    },
+    "assetBundlePatterns": [
+      "assets/**/*"
+    ],
+    "plugins": [
+      "expo-router",
+      "expo-mail-composer"
+    ],
+    "extra": {
+      "router": {},
+      "eas": {
+        "projectId": "a3b94be2-b1fb-4323-832d-8969c01fac29"
+      }
+    },
+    "owner": "lascanteras"
+  }
+}

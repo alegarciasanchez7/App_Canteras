@@ -1,3 +1,4 @@
+import "./polyfills"; // <-- Esto debe ir antes que cualquier otra importación
 import { registerRootComponent } from "expo";
 
 import App from "./App";

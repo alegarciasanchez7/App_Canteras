@@ -153,21 +153,48 @@ const AdminMenuScreen = ({ navigation, route }) => {
 
   // Guarda un nuevo socio o actualiza uno existente
   const handleGuardar = async () => {
+    console.log("Intentando guardar socio:", form);
+
     if (!form.DNI || !form.Nombre || !form.NumeroSocio || !form.password) {
+      console.warn("Campos incompletos:", form);
       Alert.alert("Atención", "Por favor, rellena todos los campos.");
       return;
     }
+
+    let passwordCifrada = "";
     try {
-      await setDoc(doc(db, "socios", form.DNI), {
-        DNI: form.DNI.trim(),
-        Nombre: form.Nombre.trim(),
-        NumeroSocio: parseInt(form.NumeroSocio, 10),
-        password: cifrar(form.password.trim()),
-      });
+      console.log("Antes de cifrar:", form.password);
+      passwordCifrada = cifrar(form.password.trim());
+      console.log("Después de cifrar:", passwordCifrada);
+    } catch (e) {
+      console.error("Error al cifrar la contraseña:", e);
+      Alert.alert("Error", "No se pudo cifrar la contraseña.");
+      return;
+    }
+
+    const socioData = {
+      DNI: form.DNI.trim(),
+      Nombre: form.Nombre.trim(),
+      NumeroSocio: parseInt(form.NumeroSocio, 10),
+      password: passwordCifrada,
+    };
+    console.log("Datos del socio:", socioData);
+
+    if (isNaN(socioData.NumeroSocio)) {
+      console.warn("Número de socio no es un número válido:", form.NumeroSocio);
+      Alert.alert("Atención", "El número de socio debe ser un número válido.");
+      return;
+    }
+
+    try {
+      console.log("Datos a guardar en Firestore:", socioData);
+      await setDoc(doc(db, "socios", socioData.DNI), socioData);
+      console.log("Socio guardado correctamente:", socioData);
       Alert.alert("Éxito", isEditing ? "Socio actualizado." : "Socio añadido.");
       limpiarFormulario();
       cargarSocios();
     } catch (error) {
+      console.error("Error al guardar socio:", error);
       Alert.alert("Error", "No se pudo guardar el socio.");
     }
   };
